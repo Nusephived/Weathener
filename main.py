@@ -40,6 +40,7 @@ with DAG(
         response = requests.get('https://meteostat.p.rapidapi.com/stations/daily', params=params, headers=headers)
         response = response.json()
         df = pd.DataFrame(response["data"])
+        df.to_csv("data/raw/weather.csv", index=False)
 
     def prepared_1():
         print("Preparing weather data...")
