@@ -3,6 +3,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 import requests
 import pandas as pd
+from data_consomation import convertir_consommation
 
 with DAG(
         'Weathener',
@@ -37,7 +38,8 @@ with DAG(
             'end': '2022-12-31',
         }
 
-        response = requests.get('https://meteostat.p.rapidapi.com/stations/daily', params=params, headers=headers)
+        response = requests.get(
+            'https://meteostat.p.rapidapi.com/stations/daily', params=params, headers=headers)
         response = response.json()
         df = pd.DataFrame(response["data"])
         df.to_csv("data/raw/weather.csv", index=False)
@@ -46,10 +48,11 @@ with DAG(
         print("Preparing weather data...")
 
     # 2nd data source
-    def raw_2():
+    def raw_energie():
         print("Hello Airflow - This is Task 2")
 
-    def prepared_2():
+    def prepared_energie():
+        converire_consomtion()
         print("Hello Airflow - This is Prepared 2")
 
     # Usage data
@@ -67,19 +70,19 @@ with DAG(
     )
 
     prepared_1 = PythonOperator(
-       task_id='prepared_1',
-       python_callable=prepared_1,
+        task_id='prepared_1',
+        python_callable=prepared_1,
     )
 
     raw_2 = PythonOperator(
-       task_id='raw_2',
-       python_callable=raw_2
-   )
+        task_id='raw_2',
+        python_callable=raw_energie,
+    )
 
     prepared_2 = PythonOperator(
-       task_id='prepared_2',
-       python_callable=prepared_2,
-   )
+        task_id='data_eneergie_traitement',
+        python_callable=prepared_energie,
+    )
 
     data = PythonOperator(
         task_id='data',
