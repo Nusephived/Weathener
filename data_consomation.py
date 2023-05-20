@@ -2,6 +2,7 @@ import pyspark.sql.functions as F
 from pyspark.sql import SparkSession
 #dépendances nécessaires pyspark et pyarrow
 
+
 def convertir_consommation():
     # Create a Spark session
     spark = SparkSession.builder.appName("Consommation").getOrCreate()
@@ -10,15 +11,24 @@ def convertir_consommation():
     data = spark.read.option("header", "true").csv(
         "data/raw/energies.csv", sep=";")
 
+    # Convert 'Date - Heure' column to UTC datetime
+    data = data.withColumn(
+        "Date - Heure", F.to_utc_timestamp(F.col("Date - Heure"), "Europe/Paris"))
+
+    # Extract 'Date' and 'Heure' columns from 'Date - Heure'
+    data = data.withColumn("Date", F.to_date(F.col("Date - Heure")))
+    data = data.withColumn("Heure", F.date_format(
+        F.col("Date - Heure"), "HH:mm:ss"))
+
     # Select relevant columns
-    selected_columns = ["Date", "Consommation brute gaz (MW PCS 0°C) - GRTgaz",
+    selected_columns = ["Date", "Heure", "Consommation brute gaz (MW PCS 0°C) - GRTgaz",
                         "Consommation brute gaz (MW PCS 0°C) - Teréga",
                         "Consommation brute gaz totale (MW PCS 0°C)",
                         "Consommation brute électricité (MW) - RTE",
                         "Consommation brute totale (MW)"]
     data = data.select(selected_columns)
 
-    # Convert the "Date - Heure" column to date format
+    # Convert the "Date" column to date format
     data = data.withColumn("Date", F.date_format("Date", "yyyy-MM-dd"))
 
     # Aggregate data by date and calculate the sum of the consumption columns
@@ -39,4 +49,5 @@ def convertir_consommation():
     aggregated_data.show()
 
     # Save the aggregated data as Parquet format
-    aggregated_data.write.mode("overwrite").parquet("data/final/energies.parquet")
+    aggregated_data.write.mode("overwrite").parquet(
+        "data/final/energies.parquet")
