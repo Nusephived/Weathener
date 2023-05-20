@@ -1,14 +1,13 @@
 import pyspark.sql.functions as F
 from pyspark.sql import SparkSession
 
-
 def convertir_consommation():
     # Create a Spark session
     spark = SparkSession.builder.appName("Consommation").getOrCreate()
 
     # Load data from a source
     data = spark.read.option("header", "true").csv(
-        "data/raw/consommation-quotidienne-brute-ile-de-france-en-2022.csv", sep=";")
+        "data/raw/energies.csv", sep=";")
 
     # Select relevant columns
     selected_columns = ["Date", "Consommation brute totale (MW)"]
@@ -23,6 +22,3 @@ def convertir_consommation():
 
     # Show the results
     aggregated_data.show()
-
-
-convertir_consommation()

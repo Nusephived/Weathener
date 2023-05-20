@@ -2,8 +2,20 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 import requests
+import os
 import pandas as pd
 from data_consomation import convertir_consommation
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import to_utc_timestamp
+
+os.environ["no_proxy"]="*"
+os.chdir('/Users/hugo/airflow/dags/')
+
+# Spark
+
+spark = SparkSession.builder.appName("Weathener").getOrCreate()
+
+# Airflow
 
 with DAG(
         'Weathener',
@@ -15,7 +27,7 @@ with DAG(
             'retries': 1,
             'retry_delay': timedelta(minutes=5),
         },
-        description='Weathener project',
+        description='ISEP project',
         schedule_interval=None,
         start_date=datetime(2022, 1, 1),
         catchup=False,
@@ -24,7 +36,7 @@ with DAG(
     dag.doc_md = """Link between weather and energies consumption in Paris, France."""
 
     # 1st data source
-    def raw_1():
+    def raw_weather():
         print("Getting weather data...")
 
         headers = {
@@ -38,21 +50,30 @@ with DAG(
             'end': '2022-12-31',
         }
 
-        response = requests.get(
-            'https://meteostat.p.rapidapi.com/stations/daily', params=params, headers=headers)
+        response = requests.get('https://meteostat.p.rapidapi.com/stations/daily', params=params, headers=headers)
         response = response.json()
         df = pd.DataFrame(response["data"])
         df.to_csv("data/raw/weather.csv", index=False)
 
-    def prepared_1():
+    def prepared_weather():
         print("Preparing weather data...")
 
+        df = spark.read.format('csv').options(header='true', delimiter=',').load('data/raw/weather.csv')
+        print(df)
+
+        columns_to_drop = ["snow", "wpgt", "tsun", "wdir", "wspd", "wpgt", "pres"]
+        df = df.drop(*columns_to_drop)
+        df = df.withColumn("date", to_utc_timestamp("date", "UTC"))
+
+        df.show()
+        df.write.csv("data/prepared/weather.csv", header=True)
+
     # 2nd data source
-    def raw_energie():
+    def raw_energies():
         print("Hello Airflow - This is Task 2")
 
-    def prepared_energie():
-        converire_consomtion()
+    def prepared_energies():
+        convertir_consommation()
         print("Hello Airflow - This is Prepared 2")
 
     # Usage data
@@ -65,23 +86,23 @@ with DAG(
 
     # Operator
     raw_1 = PythonOperator(
-        task_id='raw_1',
-        python_callable=raw_1,
+        task_id='raw_weather',
+        python_callable=raw_weather,
     )
 
     prepared_1 = PythonOperator(
-        task_id='prepared_1',
-        python_callable=prepared_1,
+        task_id='prepared_weather',
+        python_callable=prepared_weather,
     )
 
     raw_2 = PythonOperator(
-        task_id='raw_2',
-        python_callable=raw_energie,
+        task_id='raw_energies',
+        python_callable=raw_energies,
     )
 
     prepared_2 = PythonOperator(
-        task_id='data_eneergie_traitement',
-        python_callable=prepared_energie,
+        task_id='prepared_energies',
+        python_callable=prepared_energies,
     )
 
     data = PythonOperator(
