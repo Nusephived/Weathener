@@ -59,14 +59,13 @@ with DAG(
         print("Preparing weather data...")
 
         df = spark.read.format('csv').options(header='true', delimiter=',').load('data/raw/weather.csv')
-        print(df)
 
         columns_to_drop = ["snow", "wpgt", "tsun", "wdir", "wspd", "wpgt", "pres"]
         df = df.drop(*columns_to_drop)
         df = df.withColumn("date", to_utc_timestamp("date", "UTC"))
 
         df.show()
-        df.write.csv("data/prepared/weather.csv", header=True)
+        df.write.csv("data/prepared/weather", header=True)
 
     # 2nd data source
     def raw_energies():
@@ -77,8 +76,18 @@ with DAG(
         print("Hello Airflow - This is Prepared 2")
 
     # Usage data
-    def data():
-        print("Hello Airflow - This is Data")
+    def join():
+        print("Joining table on date...")
+
+        # Load the Parquet datasets into Spark DataFrames
+        df1 = spark.read.parquet("dataset1.parquet")
+        df2 = spark.read.parquet("dataset2.parquet")
+
+        # Perform the join operation
+        joined_df = df1.join(df2, on="date", how="inner")
+
+        # Show the result or save it to a file
+        joined_df.write.format("parquet").mode("overwrite").save("data/data.parquet")
 
     # Index
     def index():
@@ -107,7 +116,7 @@ with DAG(
 
     data = PythonOperator(
         task_id='data',
-        python_callable=data,
+        python_callable=join,
     )
 
     index = PythonOperator(
