@@ -50,4 +50,4 @@ def convertir_consommation():
 
     # Save the aggregated data as Parquet format
     aggregated_data.write.mode("overwrite").parquet(
-        "data/final/energies.parquet")
+        "data/prepared/energies")

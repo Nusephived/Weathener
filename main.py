@@ -7,9 +7,14 @@ import pandas as pd
 from data_consomation import convertir_consommation
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import to_utc_timestamp
+from elasticsearch import Elasticsearch
 
 os.environ["no_proxy"]="*"
 os.chdir('/Users/hugo/airflow/dags/')
+
+# Elasticsearch
+
+es = Elasticsearch([{'host': 'http://localhost/', 'port': 9200, "scheme": "https"}], verify_certs=False)
 
 # Spark
 
@@ -65,7 +70,7 @@ with DAG(
         df = df.withColumn("date", to_utc_timestamp("date", "UTC"))
 
         df.show()
-        df.write.csv("data/prepared/weather", header=True)
+        df.write.mode("overwrite").parquet("data/prepared/weather")
 
     # 2nd data source
     def raw_energies():
@@ -79,19 +84,75 @@ with DAG(
     def join():
         print("Joining table on date...")
 
-        # Load the Parquet datasets into Spark DataFrames
-        df1 = spark.read.parquet("dataset1.parquet")
-        df2 = spark.read.parquet("dataset2.parquet")
+        df_weather = spark.read.parquet("data/prepared/weather")
+        df_energies = spark.read.parquet("data/prepared/energies")
 
-        # Perform the join operation
-        joined_df = df1.join(df2, on="date", how="inner")
+        joined_df = df_weather.join(df_energies, on="date", how="inner")
 
-        # Show the result or save it to a file
-        joined_df.write.format("parquet").mode("overwrite").save("data/data.parquet")
+        joined_df.write.format("parquet").mode("overwrite").save("data/data")
 
     # Index
     def index():
-        print("Hello Airflow - This is Index")
+        print("Indexing...")
+
+        df = spark.read.parquet("data/data")
+
+        # Convert the Spark DataFrame into a dictionary RDD
+        rdd = df.rdd.map(lambda row: row.asDict())
+
+        # Indexing data in Elasticsearch
+        es.indices.create(index='data', ignore=400)
+        es.indices.put_mapping(index='data', body={"properties": df.schema.json()})
+        rdd.foreach(lambda doc: es.index(index='data', body=doc))
+
+        # Check indexation
+        res = es.search(index='data', body={"query": {"match_all": {}}})
+        print(f"Nombre de documents indexés : {res['hits']['total']['value']}")
+
+        # Kibana dashboard
+        dashboard_config = {
+            "objects": [
+                {
+                    "id": "1",
+                    "type": "index-pattern",
+                    "attributes": {
+                        "title": "nom_de_votre_index-*",
+                        "timeFieldName": "timestamp"
+                    }
+                },
+                {
+                    "id": "2",
+                    "type": "visualization",
+                    "attributes": {
+                        "title": "Nom de votre visualisation",
+                        "visState": "{\"type\":\"visualization type\",\"params\":{\"aggs\":[],\"listeners\":{}},\"title\":\"Nom de votre visualisation\",\"uiStateJSON\":\"{}\"}",
+                        "uiStateJSON": "{}"
+                    }
+                },
+                {
+                    "id": "3",
+                    "type": "dashboard",
+                    "attributes": {
+                        "title": "Nom de votre tableau de bord",
+                        "panelsJSON": "[{\"gridData\":{\"x\":0,\"y\":0,\"w\":12,\"h\":6,\"i\":\"2\"},\"panelRefName\":\"panel_0\",\"embeddableConfig\":{\"vis\":{\"id\":\"2\",\"embeddableConfig\":{},\"type\":\"visualization\"}}}]"
+                    },
+                    "references": [
+                        {"name": "panel_0", "type": "visualization", "id": "2"}
+                    ]
+                }
+            ]
+        }
+
+        # Send the request
+        response = es.transport.perform_request(
+            method='POST',
+            url='/_kibana/visualization/_bulk_create',
+            headers={'Content-Type': 'application/json'},
+            body=dashboard_config
+        )
+
+        # Close Spark session
+        spark.stop()
 
     # Operator
     raw_1 = PythonOperator(
@@ -114,8 +175,8 @@ with DAG(
         python_callable=prepared_energies,
     )
 
-    data = PythonOperator(
-        task_id='data',
+    join = PythonOperator(
+        task_id='join',
         python_callable=join,
     )
 
@@ -128,7 +189,6 @@ with DAG(
     raw_1 >> prepared_1
     raw_2 >> prepared_2
 
-    prepared_1 >> data
-    prepared_2 >> data
+    prepared_1, prepared_2 >> join
 
-    data >> index
+    join >> index
