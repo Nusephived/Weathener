@@ -124,8 +124,7 @@ with DAG(
         )
 
         # Save the aggregated data as Parquet format
-        aggregated_data.write.mode("overwrite").parquet(
-        "data/prepared/energies")
+        aggregated_data.write.mode("overwrite").parquet("data/prepared/energies")
 
     # Usage data
     def join():
