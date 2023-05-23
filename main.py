@@ -79,19 +79,20 @@ with DAG(
         # Load data from a source
         data = spark.read.option("header", "true").csv("data/raw/energies.csv", sep=";")
 
-        # Convert 'Date - Heure' column to UTC datetime
-        data = data.withColumn("Date - Heure", F.to_utc_timestamp(F.col("Date - Heure"), "Europe/Paris"))
-
-        # Extract 'Date' and 'Heure' columns from 'Date - Heure'
-        data = data.withColumn("Date", F.to_date(F.col("Date - Heure")))
-        data = data.withColumn("Heure", F.date_format(F.col("Date - Heure"), "HH:mm:ss"))
-
-        data.to_csv("data/raw/energies.csv", index=False)
-
     def prepared_energies():
         print("Preparing energies data...")
         # Load data from a source
-        data = spark.read.option("header", "true").csv("data/raw/energies.csv", sep=";")
+        data = spark.read.option("header", "true").csv(
+            "data/raw/energies.csv", sep=";")
+
+        # Convert 'Date - Heure' column to UTC datetime
+        data = data.withColumn(
+            "Date - Heure", F.to_utc_timestamp(F.col("Date - Heure"), "Europe/Paris"))
+
+        # Extract 'Date' and 'Heure' columns from 'Date - Heure'
+        data = data.withColumn("Date", F.to_date(F.col("Date - Heure")))
+        data = data.withColumn("Heure", F.date_format(
+            F.col("Date - Heure"), "HH:mm:ss"))
 
         # Select relevant columns
         selected_columns = ["Date", "Heure", "Consommation brute gaz (MW PCS 0°C) - GRTgaz",
