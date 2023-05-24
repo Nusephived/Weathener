@@ -221,24 +221,7 @@ with DAG(
             # 'Content-Type': 'application/json',
         }
 
-        json_data = [
-            {
-                'type': 'index-pattern',
-                'id': 'my-pattern',
-                'attributes': {
-                    'title': 'my-pattern-*',
-                },
-            },
-            {
-                'type': 'dashboard',
-                'id': 'be3733a0-9efe-11e7-acb3-3dab96693fab',
-                'attributes': {
-                    'title': 'Look at my dashboard',
-                },
-            },
-        ]
-
-        response = requests.post('http://localhost:5601/api/saved_objects/_bulk_create', headers=headers,json=json_data)
+        response = requests.post('http://localhost:5601/api/saved_objects/_bulk_create', headers=headers,json=dashboard_config_json)
 
         print(response)
         print(response.text)
