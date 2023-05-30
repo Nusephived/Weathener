@@ -135,6 +135,8 @@ with DAG(
 
         joined_df.write.format("parquet").mode("overwrite").save("data/data")
 
+        print(joined_df.dtypes)
+
     # Index
     def index():
         print("Indexing...")
