@@ -117,7 +117,7 @@ with DAG(
                 "Consommation brute gaz totale (MW)"),
             F.sum("Consommation brute électricité (MW) - RTE").alias(
                 "Consommation brute électricité RTE (MW)"),
-            F.sum("Consommation brute totale (MW)").alias(
+            (F.sum("Consommation brute électricité (MW) - RTE") + F.sum("Consommation brute gaz totale (MW PCS 0°C)")).alias(
                 "Consommation brute totale (MW)")
         )
 
