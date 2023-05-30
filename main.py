@@ -36,7 +36,7 @@ with DAG(
         },
         description='ISEP project',
         schedule_interval=None,
-        start_date=datetime(2022, 1, 1),
+        start_date=datetime(2021, 1, 1),
         catchup=False,
         tags=['Weather', 'Energies'],
 ) as dag:
@@ -53,8 +53,8 @@ with DAG(
 
         params = {
             'station': '07156',
-            'start': '2022-01-01',
-            'end': '2022-12-31',
+            'start': '2021-01-01',
+            'end': '2022-06-30',
         }
 
         response = requests.get('https://meteostat.p.rapidapi.com/stations/daily', params=params, headers=headers)
@@ -105,6 +105,7 @@ with DAG(
 
         # Convert the "Date" column to date format
         data = data.withColumn("Date", F.date_format("Date", "yyyy-MM-dd"))
+        data = data.withColumn("date", to_utc_timestamp("date", "UTC"))
 
         # Aggregate data by date and calculate the sum of the consumption columns
         aggregated_data = data.groupBy("Date").agg(
